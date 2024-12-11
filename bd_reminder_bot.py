@@ -16,7 +16,7 @@ conn.commit()
 
 # Функция для начала взаимодействия
 async def start(update: Update, context: CallbackContext):
-    await update.message.reply_text("Доброго дня тебе, SWATовец! Я бот для поздравлений с днем рождения. Отправь мне свою дату рождения в формате DD-MM-YYYY. ✍️")
+    await update.message.reply_text(f"Доброго дня тебе, SWATовец!/nОтправь мне свою дату рождения в формате DD-MM-YYYY.")
 
 # Функция для записи дня рождения
 async def save_birthday(update: Update, context: CallbackContext):
@@ -29,9 +29,9 @@ async def save_birthday(update: Update, context: CallbackContext):
         c.execute("INSERT OR REPLACE INTO birthdays (user_id, username, chat_id, birthday) VALUES (?, ?, ?, ?)",
                   (user_id, username, chat_id, birthday))
         conn.commit()
-        await update.message.reply_text("Сохранил твой день рождения. Ожидай поздравлений в этот день. 🫡")
+        await update.message.reply_text("Сохранил твой день рождения. Ожидай поздравлений!")
     except ValueError:
-        await update.message.reply_text("Что-то тыы не то написал... Используй формат DD-MM-YYYY.")
+        await update.message.reply_text("Что-то ты не то написал... Используй формат DD-MM-YYYY.")
 
 # Функция для проверки и отправки поздравлений
 async def check_birthdays(context: CallbackContext):
@@ -47,10 +47,10 @@ async def check_birthdays(context: CallbackContext):
 
 # Основная функция
 if __name__ == "__main__":
-    TOKEN = "7626935089:AAHvVtQ7uED7jF40x6jhL9Qrc7Epdpu7wGU"
+    TOKEN = "token"
     application = Application.builder().token(TOKEN).build()
 
-    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("set_birthday", start))
     application.add_handler(MessageHandler(filters.Regex("^\d{2}-\d{2}-\d{4}$"), save_birthday))
 
     # Создаем JobQueue вручную и запускаем задачу
