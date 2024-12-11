@@ -16,7 +16,7 @@ conn.commit()
 
 # Функция для начала взаимодействия
 async def start(update: Update, context: CallbackContext):
-    await update.message.reply_text("Привет! Я бот для поздравлений с днем рождения. Отправь мне свою дату рождения в формате DD-MM-YYYY.")
+    await update.message.reply_text("Доброго дня тебе, SWATовец! Я бот для поздравлений с днем рождения. Отправь мне свою дату рождения в формате DD-MM-YYYY. ✍️")
 
 # Функция для записи дня рождения
 async def save_birthday(update: Update, context: CallbackContext):
@@ -29,9 +29,9 @@ async def save_birthday(update: Update, context: CallbackContext):
         c.execute("INSERT OR REPLACE INTO birthdays (user_id, username, chat_id, birthday) VALUES (?, ?, ?, ?)",
                   (user_id, username, chat_id, birthday))
         conn.commit()
-        await update.message.reply_text("Ваш день рождения успешно сохранен!")
+        await update.message.reply_text("Сохранил твой день рождения. Ожидай поздравлений в этот день. 🫡")
     except ValueError:
-        await update.message.reply_text("Неправильный формат даты. Пожалуйста, используйте формат DD-MM-YYYY.")
+        await update.message.reply_text("Что-то тыы не то написал... Используй формат DD-MM-YYYY.")
 
 # Функция для проверки и отправки поздравлений
 async def check_birthdays(context: CallbackContext):
@@ -42,7 +42,8 @@ async def check_birthdays(context: CallbackContext):
     results = c.fetchall()
 
     for username, chat_id in results:
-        await bot.send_message(chat_id=chat_id, text=f"Сегодня день рождения у @{username}! Поздравляем!")
+        await bot.send_message(chat_id=chat_id, text=f"Сегодня день рождения у @{username}! Поздравляем бойца!🎉")
+        await bot.se
 
 # Основная функция
 if __name__ == "__main__":
