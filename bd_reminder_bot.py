@@ -47,7 +47,7 @@ async def check_birthdays(context: CallbackContext):
 
 # Основная функция
 if __name__ == "__main__":
-    TOKEN = "TOKEN"
+    TOKEN = "7626935089:AAHvVtQ7uED7jF40x6jhL9Qrc7Epdpu7wGU"
     application = Application.builder().token(TOKEN).build()
 
     application.add_handler(CommandHandler("start", start))
