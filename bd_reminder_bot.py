@@ -1,100 +1,62 @@
-from telethon import TelegramClient, events
 import sqlite3
 from datetime import datetime, time
-import asyncio
-from api_settings import *
+from telegram import Update, Bot
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
+from telegram.ext import JobQueue
 
-# Настройка клиента бота
-client = TelegramClient('bot_session', api_id, api_hash).start(bot_token=bot_token)
-group_chat_id = None
+# Создаем базу данных для хранения информации о днях рождения
+conn = sqlite3.connect("birthdays.db")
+c = conn.cursor()
+c.execute('''CREATE TABLE IF NOT EXISTS birthdays (
+             user_id INTEGER, 
+             username TEXT, 
+             chat_id INTEGER,
+             birthday DATE)''')
+conn.commit()
 
-# Запись ID группового чата
-@client.on(events.ChatAction)
-async def capture_group_id(event):
-    global group_chat_id
+# Функция для начала взаимодействия
+async def start(update: Update, context: CallbackContext):
+    await update.message.reply_text("Привет! Я бот для поздравлений с днем рождения. Отправь мне свою дату рождения в формате DD-MM-YYYY.")
 
-    # Проверяем, если это групповое событие
-    if event.is_group:
-        group_chat_id = event.chat_id
-        print(f"ID группы сохранен: {group_chat_id}")
+# Функция для записи дня рождения
+async def save_birthday(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    username = update.message.from_user.username or update.message.from_user.first_name
+    chat_id = update.message.chat_id
 
-        # Сохраняем ID в файл
-        with open("group_id.txt", "w") as file:
-            file.write(str(group_chat_id))
-
-with open("group_id.txt", "r") as file:
-    group_chat_id = int(file.read().strip())
-
-# Настройка базы данных
-db = sqlite3.connect('birthdays.db')
-cursor = db.cursor()
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS birthdays (
-    user_id INTEGER PRIMARY KEY,
-    username TEXT,
-    birthday DATE
-)
-""")
-db.commit()
-
-# Команда для установки дня рождения
-@client.on(events.NewMessage(pattern='/set_birthday'))
-async def set_birthday(event):
     try:
-        args = event.message.text.split()
-        if len(args) < 2:
-            await event.reply('Укажите дату в формате: /set_birthday DD-MM-YYYY')
-            return
-        
-        date = args[1]
-        birthday = datetime.strptime(date, "%d-%m-%Y").date()
-        user_id = event.sender_id
-        username = event.sender.username or event.sender.first_name
-        
-        cursor.execute("REPLACE INTO birthdays (user_id, username, birthday) VALUES (?, ?, ?)", 
-                       (user_id, username, birthday))
-        db.commit()
-        
-        await event.reply(f"Дата рождения {birthday.strftime('%d-%m-%Y')} успешно сохранена!")
-    
+        birthday = datetime.strptime(update.message.text, "%d-%m-%Y").date()
+        c.execute("INSERT OR REPLACE INTO birthdays (user_id, username, chat_id, birthday) VALUES (?, ?, ?, ?)",
+                  (user_id, username, chat_id, birthday))
+        conn.commit()
+        await update.message.reply_text("Ваш день рождения успешно сохранен!")
     except ValueError:
-        await event.reply("Неверный формат даты. Используйте: /set_birthday DD-MM-YYYY")
+        await update.message.reply_text("Неправильный формат даты. Пожалуйста, используйте формат DD-MM-YYYY.")
 
-# Функция для проверки и отправки уведомлений о днях рождения
-async def check_birthdays():
-    now = datetime.now()
-    today = now.date()
-    current_time = now.time()
-    
-    # Если текущее время не равно 7:00 утра, выходим
-    if current_time != time(7, 0):
-        return
+# Функция для проверки и отправки поздравлений
+async def check_birthdays(context: CallbackContext):
+    bot: Bot = context.bot
+    today = datetime.now().date()
 
-    cursor.execute("SELECT username, birthday FROM birthdays")
-    for username, birthday in cursor.fetchall():
-        # Приводим дату рождения к текущему году
-        next_birthday = datetime.strptime(birthday, "%Y-%m-%d").date().replace(year=today.year)
-        if next_birthday == today:
-            await client.send_message(
-                group_chat_id,
-                f"Сегодня день рождения у @{username}! 🎉"
-            )
+    c.execute("SELECT username, chat_id FROM birthdays WHERE strftime('%m-%d', birthday) = ?", (today.strftime("%m-%d"),))
+    results = c.fetchall()
 
-# Планировщик для регулярной проверки
-async def scheduler():
-    while True:
-        await check_birthdays()
-        await asyncio.sleep(60)  # Проверяем каждые 60 секунд
+    for username, chat_id in results:
+        await bot.send_message(chat_id=chat_id, text=f"Сегодня день рождения у @{username}! Поздравляем!")
 
-# Запуск бота
-async def main():
-    print("Бот запущен!")
-    await client.start(bot_token=bot_token)
+# Основная функция
+if __name__ == "__main__":
+    TOKEN = "TOKEN"
+    application = Application.builder().token(TOKEN).build()
 
-    # Запускаем планировщик в отдельной задаче
-    asyncio.create_task(scheduler())
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.Regex("^\d{2}-\d{2}-\d{4}$"), save_birthday))
 
-    await client.run_until_disconnected()
+    # Создаем JobQueue вручную и запускаем задачу
+    job_queue = JobQueue()
+    job_queue.set_application(application)
+    job_queue.run_daily(check_birthdays, time=time(hour=9))
 
-if __name__ == '__main__':
-    asyncio.run(main())
+    # Запускаем JobQueue и бота
+    job_queue.start()
+    application.run_polling()
